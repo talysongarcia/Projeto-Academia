@@ -1,0 +1,6 @@
+{
+  "name": "Volt Performance",
+  "description": "Rastreamento de fitness de alta performance com uma estética de alto contraste.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
