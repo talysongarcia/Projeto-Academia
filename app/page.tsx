@@ -42,7 +42,8 @@ interface WorkoutPlan {
 
 interface WorkoutLog {
   [date: string]: {
-    [exerciseId: string]: boolean;
+    finished?: boolean;
+    exercises: { [exerciseId: string]: boolean };
   };
 }
 
@@ -92,6 +93,9 @@ export default function VoltApp() {
   const [newEx, setNewEx] = React.useState({ name: '', sets: 3, reps: '10', groupId: INITIAL_GROUPS[0]?.id || '', image: '' });
   const [newGroup, setNewGroup] = React.useState({ name: '', image: '' });
 
+  // Image Preview State
+  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+
   const getDayName = (date: Date) => {
     const day = date.getDay(); // 0 is Sunday
     const index = day === 0 ? 6 : day - 1;
@@ -104,13 +108,35 @@ export default function VoltApp() {
 
   const toggleExercise = (exerciseId: string) => {
     const dateKey = formatDateKey(selectedDate);
+    const dayData = logs[dateKey] || { exercises: {} };
+    
+    if (dayData.finished) return;
+
     setLogs(prev => ({
       ...prev,
       [dateKey]: {
-        ...(prev[dateKey] || {}),
-        [exerciseId]: !prev[dateKey]?.[exerciseId]
+        ...dayData,
+        exercises: {
+          ...dayData.exercises,
+          [exerciseId]: !dayData.exercises[exerciseId]
+        }
       }
     }));
+  };
+
+  const finishWorkout = () => {
+    const dateKey = formatDateKey(selectedDate);
+    const dayData = logs[dateKey] || { exercises: {} };
+    
+    if (confirm('Deseja realmente finalizar o treino? Após finalizar, não será possível alterar os exercícios.')) {
+      setLogs(prev => ({
+        ...prev,
+        [dateKey]: {
+          ...dayData,
+          finished: true
+        }
+      }));
+    }
   };
 
   // --- Views ---
@@ -131,7 +157,7 @@ export default function VoltApp() {
         {/* Treinos da Semana */}
         <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem]">
           <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest mb-4">Status Semanal</h3>
-          <div className="flex justify-between items-center gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {SHORT_DAYS.map((day, i) => {
               const dayName = WEEKDAYS[i];
               const hasGroup = plan[dayName];
@@ -139,13 +165,13 @@ export default function VoltApp() {
               return (
                 <div key={day} className="flex flex-col items-center gap-2">
                   <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center border transition-all",
+                    "w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border transition-all",
                     hasGroup ? (isCompleted ? "bg-primary-container border-primary-container" : "bg-white/5 border-white/10") : "bg-transparent border-dashed border-white/5 opacity-30"
                   )}>
-                    {hasGroup && isCompleted ? <Check className="w-5 h-5 text-on-primary-container" /> : null}
+                    {hasGroup && isCompleted ? <Check className="w-4 h-4 sm:w-5 h-5 text-on-primary-container" /> : null}
                     {hasGroup && !isCompleted ? <div className="w-1.5 h-1.5 rounded-full bg-white/20" /> : null}
                   </div>
-                  <span className="text-[10px] text-outline font-bold uppercase">{day}</span>
+                  <span className="text-[9px] sm:text-[10px] text-outline font-bold uppercase">{day}</span>
                 </div>
               );
             })}
@@ -180,7 +206,9 @@ export default function VoltApp() {
     const group = groups.find(g => g.id === groupId);
     const dayExercises = exercises.filter(e => e.groupId === groupId);
     const dateKey = formatDateKey(selectedDate);
-    const dayLogs = logs[dateKey] || {};
+    const dayData = logs[dateKey] || { exercises: {} };
+    const dayLogs = dayData.exercises;
+    const isFinished = dayData.finished;
     const completedCount = dayExercises.filter(e => dayLogs[e.id]).length;
     const remains = dayExercises.length - completedCount;
 
@@ -189,29 +217,9 @@ export default function VoltApp() {
         initial={{ opacity: 0, scale: 0.95 }} 
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0 }}
-        className="space-y-8 pb-10"
+        className="space-y-6 pb-10"
       >
-        <section className="flex items-center justify-between">
-          <h2 className="font-anybody font-bold text-3xl text-primary uppercase">
-            {selectedDate.toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()}
-          </h2>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
-              className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container border border-white/5 active:scale-95 transition-transform"
-            >
-              <ChevronLeft className="w-5 h-5 text-outline" />
-            </button>
-            <button 
-              onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
-              className="w-10 h-10 flex items-center justify-center rounded-lg bg-surface-container border border-white/5 active:scale-95 transition-transform"
-            >
-              <ChevronRight className="w-5 h-5 text-outline" />
-            </button>
-          </div>
-        </section>
-
-        {/* Simple Horizontal Calendar */}
+        {/* Horizontal Calendar */}
         <section className="flex overflow-x-auto gap-2 pb-2 no-scrollbar calendar-mask -mx-5 px-5">
           {Array.from({ length: 7 }).map((_, i) => {
             const d = new Date(selectedDate);
@@ -276,7 +284,8 @@ export default function VoltApp() {
                   <div className="flex-shrink-0">
                     <div className={cn(
                       "w-7 h-7 rounded-md flex items-center justify-center transition-all duration-300",
-                      dayLogs[exercise.id] ? "bg-primary-container completed-glow" : "border-2 border-outline/30"
+                      dayLogs[exercise.id] ? "bg-primary-container completed-glow" : "border-2 border-outline/30",
+                      isFinished && !dayLogs[exercise.id] && "opacity-20"
                     )}>
                       {dayLogs[exercise.id] && <Check className="w-4 h-4 text-on-primary-container stroke-[3px]" />}
                     </div>
@@ -298,8 +307,7 @@ export default function VoltApp() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        // Open image logic here (for now just alert/toggle)
-                        alert(`Visualizar: ${exercise.name}`);
+                        setSelectedImage(exercise.image!);
                       }}
                       className="p-2 text-outline hover:text-primary-container transition-colors"
                     >
@@ -310,15 +318,16 @@ export default function VoltApp() {
               ))}
 
               <button 
-                disabled={completedCount < dayExercises.length}
+                onClick={finishWorkout}
+                disabled={completedCount < dayExercises.length || isFinished}
                 className={cn(
                   "w-full py-4 rounded-xl font-bold uppercase tracking-widest transition-all",
-                  completedCount < dayExercises.length
+                  (completedCount < dayExercises.length || isFinished)
                     ? "bg-white/5 text-outline cursor-not-allowed"
                     : "bg-primary-container text-on-primary-container shadow-[0_0_20px_rgba(195,244,0,0.4)] active:scale-95"
                 )}
               >
-                Finalizar Treino
+                {isFinished ? 'Treino Finalizado' : 'Finalizar Treino'}
               </button>
             </>
           ) : (
@@ -340,8 +349,7 @@ export default function VoltApp() {
         className="space-y-12 pb-40"
       >
         <section>
-          <h2 className="font-anybody font-bold text-3xl text-primary uppercase">Cadastros</h2>
-          <p className="text-outline text-sm">Personalize seu treinamento</p>
+          <h2 className="font-anybody font-bold text-3xl text-primary uppercase">PERSONALIZAÇÃO</h2>
         </section>
 
         {/* Montar Treino da Semana */}
@@ -412,10 +420,6 @@ export default function VoltApp() {
             {groups.map(g => (
               <div key={g.id} className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs">
                 {g.name}
-                <X 
-                  className="w-3 h-3 cursor-pointer opacity-40 hover:opacity-100" 
-                  onClick={() => setGroups(groups.filter(item => item.id !== g.id))}
-                />
               </div>
             ))}
           </div>
@@ -591,6 +595,41 @@ export default function VoltApp() {
           {activeView === 'stats' && renderStats()}
         </AnimatePresence>
       </main>
+
+      {/* Image Overlay */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedImage(null)}
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-5"
+          >
+            <motion.div 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative w-full max-w-lg aspect-square rounded-3xl overflow-hidden border border-white/10"
+              onClick={e => e.stopPropagation()}
+            >
+              <Image 
+                src={selectedImage} 
+                alt="Exercise" 
+                fill 
+                className="object-cover" 
+                referrerPolicy="no-referrer"
+              />
+              <button 
+                onClick={() => setSelectedImage(null)}
+                className="absolute top-4 right-4 bg-black/50 p-2 rounded-full text-white backdrop-blur-sm"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Nav */}
       <nav className="fixed bottom-0 w-full z-50 bg-[#131313]/90 backdrop-blur-xl border-t border-white/10 rounded-t-[2rem] shadow-[0_-4px_20px_rgba(195,244,0,0.1)] flex justify-around items-center h-20 pb-safe px-4">
