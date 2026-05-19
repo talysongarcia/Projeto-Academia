@@ -15,7 +15,10 @@ import {
   CalendarDays,
   Plus,
   X,
-  ImageIcon
+  ImageIcon,
+  Users,
+  Upload,
+  LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -43,6 +46,7 @@ interface WorkoutPlan {
 interface WorkoutLog {
   [date: string]: {
     finished?: boolean;
+    finishedAt?: string;
     exercises: { [exerciseId: string]: boolean };
   };
 }
@@ -85,11 +89,16 @@ const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', '
 const SHORT_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const AVATARS = [
-  'https://picsum.photos/seed/user1/200/200',
-  'https://picsum.photos/seed/user2/200/200',
-  'https://picsum.photos/seed/user3/200/200',
-  'https://picsum.photos/seed/user4/200/200',
-  'https://picsum.photos/seed/user5/200/200',
+  'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1541364983171-a8ba01e95cfc?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1474511320723-9a56873867b5?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1484406566174-9da000fda645?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1521651201144-634f700b36ef?w=200&h=200&fit=crop',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop',
 ];
 
 // --- Components ---
@@ -122,8 +131,15 @@ export default function VoltApp() {
 
   // Image Preview State
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
-
   const [showConfirm, setShowConfirm] = React.useState(false);
+  const [selectedStudentId, setSelectedStudentId] = React.useState<string>('');
+  const [saveStatus, setSaveStatus] = React.useState<string | null>(null);
+
+  const [authenticatedStudent, setAuthenticatedStudent] = React.useState<Student | null>(null);
+  const [loginStage, setLoginStage] = React.useState<'SELECT' | 'PIN'>('SELECT');
+  const [selectedForLogin, setSelectedForLogin] = React.useState<Student | null>(null);
+  const [pinInput, setPinInput] = React.useState('');
+  const [loginError, setLoginError] = React.useState(false);
 
   if (!mounted || !selectedDate) return <div className="min-h-screen bg-background" />;
 
@@ -162,6 +178,9 @@ export default function VoltApp() {
 
   const finishWorkout = () => {
     const dateKey = formatDateKey(selectedDate);
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = now.toLocaleDateString('pt-BR');
     
     setLogs(prev => {
       const dayData = prev[dateKey] || { exercises: {} };
@@ -169,11 +188,28 @@ export default function VoltApp() {
         ...prev,
         [dateKey]: {
           ...dayData,
-          finished: true
+          finished: true,
+          finishedAt: `${dateStr} às ${timeStr}`
         }
       };
     });
     setShowConfirm(false);
+  };
+
+  const savePlan = () => {
+    setSaveStatus("Treino alterado com sucesso");
+    setTimeout(() => setSaveStatus(null), 3000);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        callback(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // --- Views ---
@@ -186,7 +222,7 @@ export default function VoltApp() {
       className="space-y-4"
     >
       <section>
-        <h2 className="font-anybody font-bold text-3xl text-primary leading-tight">Dashboard</h2>
+        <h2 className="font-anybody font-bold text-3xl text-primary leading-tight uppercase">Inicio</h2>
         <p className="text-outline text-xs">Seu desempenho semanal</p>
       </section>
 
@@ -308,7 +344,7 @@ export default function VoltApp() {
           </h3>
           {group && (
             <span className="font-lexend text-[10px] font-bold text-primary-container bg-primary-container/10 px-3 py-1 rounded-full uppercase">
-              {remains} Exercícios Restantes
+              {remains} Restantes
             </span>
           )}
         </section>
@@ -378,6 +414,11 @@ export default function VoltApp() {
               >
                 {isFinished ? 'Treino Finalizado' : 'Finalizar Treino'}
               </button>
+              {isFinished && dayData.finishedAt && (
+                <p className="text-center text-[10px] text-primary-container font-bold uppercase tracking-wider animate-pulse">
+                  Concluído em: {dayData.finishedAt}
+                </p>
+              )}
             </>
           ) : (
             <div className="text-center py-10 opacity-30">
@@ -424,6 +465,27 @@ export default function VoltApp() {
               </div>
             ))}
           </div>
+          <div className="space-y-3 mt-2">
+            <button 
+              onClick={savePlan}
+              className="w-full bg-white/5 border border-white/10 text-primary-container font-lexend font-bold py-3 rounded-xl hover:bg-white/10 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              SALVAR TREINO
+            </button>
+            <AnimatePresence>
+              {saveStatus && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="text-center text-xs font-bold text-primary-container"
+                >
+                  {saveStatus}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
         </section>
 
         {/* Cadastrar Grupos */}
@@ -443,20 +505,10 @@ export default function VoltApp() {
                 className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary-container outline-none transition-all"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] text-outline uppercase font-bold tracking-widest">URL da Imagem (Opcional)</label>
-              <input 
-                type="text" 
-                placeholder="https://..." 
-                value={newGroup.image}
-                onChange={e => setNewGroup({ ...newGroup, image: e.target.value })}
-                className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary-container outline-none transition-all"
-              />
-            </div>
             <button 
               onClick={() => {
                 if (newGroup.name) {
-                  setGroups([...groups, { id: Date.now().toString(), name: newGroup.name, image: newGroup.image }]);
+                  setGroups([...groups, { id: Date.now().toString(), name: newGroup.name }]);
                   setNewGroup({ name: '', image: '' });
                 }
               }}
@@ -511,14 +563,30 @@ export default function VoltApp() {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] text-outline uppercase font-bold tracking-widest">URL da Imagem (Opcional)</label>
-              <input 
-                type="text" 
-                placeholder="https://..." 
-                value={newEx.image}
-                onChange={e => setNewEx({ ...newEx, image: e.target.value })}
-                className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary-container outline-none transition-all"
-              />
+              <label className="text-[10px] text-outline uppercase font-bold tracking-widest">Foto do Exercício (Opcional)</label>
+              <div className="flex items-center gap-4">
+                <label className="flex-1 flex items-center justify-center gap-2 bg-background border border-dashed border-white/20 rounded-xl p-4 cursor-pointer hover:border-primary-container hover:bg-primary-container/5 transition-all group">
+                  <Upload className="w-5 h-5 text-outline group-hover:text-primary-container" />
+                  <span className="text-sm font-semibold text-outline group-hover:text-primary-container uppercase tracking-tight">Upload da imagem</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={(e) => handleImageUpload(e, (url) => setNewEx({ ...newEx, image: url }))}
+                  />
+                </label>
+                {newEx.image && (
+                  <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-primary-container/50">
+                    <Image src={newEx.image} alt="Preview" fill className="object-cover" />
+                    <button 
+                      onClick={() => setNewEx({ ...newEx, image: '' })}
+                      className="absolute top-0.5 right-0.5 bg-black/50 rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] text-outline uppercase font-bold tracking-widest">Grupo Muscular</label>
@@ -559,7 +627,7 @@ export default function VoltApp() {
       <section>
         <h2 className="font-anybody font-bold text-3xl text-primary">CONFIGURAÇÕES</h2>
       </section>
-
+      
       <div className="grid grid-cols-1 gap-3">
         <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] space-y-3">
           <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Grupos Cadastrados</h3>
@@ -582,26 +650,14 @@ export default function VoltApp() {
                   <p className="text-sm font-bold">{e.name}</p>
                   <p className="text-[10px] text-outline">{groups.find(g => g.id === e.groupId)?.name} • {e.sets}x{e.reps}</p>
                 </div>
-                {e.image && <ImageIcon className="w-4 h-4 text-primary-container" />}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] space-y-3">
-          <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Volume de Carga (kg)</h3>
-          <div className="h-48 flex items-end justify-between gap-2 px-2">
-            {[30, 45, 60, 80, 75, 90, 85, 100].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: `${h}%` }}
-                  className={cn(
-                    "w-full rounded-t-lg",
-                    i === 7 ? "bg-primary-container" : "bg-white/10"
-                  )}
-                />
-                <span className="text-[8px] text-outline font-bold">S{i+1}</span>
+                {e.image && (
+                  <button 
+                    onClick={() => setSelectedImage(e.image!)}
+                    className="p-2 text-primary-container hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -651,13 +707,13 @@ export default function VoltApp() {
 
             <div className="space-y-3">
               <label className="text-[10px] text-outline uppercase font-bold tracking-widest block">Escolha um Avatar</label>
-              <div className="flex justify-between items-center bg-background/50 p-3 rounded-2xl border border-white/5">
+              <div className="grid grid-cols-5 gap-3 bg-background/50 p-4 rounded-2xl border border-white/5">
                 {AVATARS.map((avatar, idx) => (
                   <button
                     key={idx}
                     onClick={() => setNewStudent({ ...newStudent, avatar })}
                     className={cn(
-                      "relative w-10 h-10 rounded-full overflow-hidden border-2 transition-all",
+                      "relative w-10 h-10 rounded-full overflow-hidden border-2 transition-all mx-auto",
                       newStudent.avatar === avatar ? "border-primary-container scale-110 shadow-lg" : "border-transparent opacity-40 hover:opacity-80"
                     )}
                   >
@@ -703,18 +759,187 @@ export default function VoltApp() {
     </motion.div>
   );
 
+  const renderLogin = () => (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center p-6 space-y-8"
+    >
+      <div className="text-center space-y-2">
+        <div className="w-20 h-20 bg-primary-container rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(195,244,0,0.2)]">
+          <Dumbbell className="w-10 h-10 text-on-primary-container" />
+        </div>
+        <h1 className="font-anybody font-black text-4xl text-primary tracking-tighter uppercase leading-none">
+          TREINO FOFO
+        </h1>
+        <p className="text-outline text-xs uppercase tracking-[0.2em] font-bold">Quem está acessando?</p>
+      </div>
+
+      <div className="w-full max-w-sm space-y-6">
+        <AnimatePresence mode="wait">
+          {loginStage === 'SELECT' ? (
+            <motion.div 
+              key="select"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid grid-cols-2 gap-4"
+            >
+              {students.length > 0 ? (
+                students.map(student => (
+                  <button
+                    key={student.id}
+                    onClick={() => {
+                      setSelectedForLogin(student);
+                      setLoginStage('PIN');
+                    }}
+                    className="bg-surface-container border border-white/5 p-5 rounded-[2rem] flex flex-col items-center gap-3 hover:border-primary-container/30 transition-all active:scale-95 group"
+                  >
+                    <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-transparent group-hover:border-primary-container transition-all">
+                      <Image src={student.avatar} alt={student.name} fill className="object-cover" />
+                    </div>
+                    <span className="text-sm font-bold uppercase w-full text-center line-clamp-2 px-2">{student.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-2 text-center py-10 space-y-4">
+                  <p className="text-outline text-sm italic">Nenhum aluno cadastrado no sistema.</p>
+                  <button 
+                    onClick={() => {
+                      // Temporary for evaluation - seed one if empty
+                      const dummy = { id: 'dummy', name: 'Aluno Exemplo', pin: '1234', avatar: AVATARS[0] };
+                      setStudents([dummy]);
+                    }}
+                    className="text-primary-container text-xs font-bold uppercase tracking-widest underline"
+                  >
+                    Criar aluno de teste
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="pin"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-surface-container border border-white/5 p-8 rounded-[2.5rem] space-y-8 text-center"
+            >
+              <div className="space-y-3">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-primary-container mx-auto shadow-2xl">
+                  <Image src={selectedForLogin?.avatar || ''} alt="User" fill className="object-cover" />
+                </div>
+                <h3 className="font-lexend font-bold text-xl uppercase tracking-tighter">{selectedForLogin?.name}</h3>
+                <p className="text-[10px] text-outline uppercase font-bold tracking-widest">Insira seu PIN de 4 dígitos</p>
+              </div>
+
+              <div className="flex justify-center gap-4">
+                {[0, 1, 2, 3].map(i => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "w-4 h-4 rounded-full transition-all duration-300",
+                      pinInput.length > i 
+                        ? "bg-primary-container scale-125 shadow-[0_0_10px_rgba(195,244,0,0.5)]" 
+                        : "bg-white/10"
+                    )}
+                  />
+                ))}
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'X', 0, '✓'].map(num => (
+                  <button
+                    key={num.toString()}
+                    onClick={() => {
+                      if (num === 'X') setPinInput(prev => prev.slice(0, -1));
+                      else if (num === '✓') {
+                        if (pinInput === selectedForLogin?.pin) {
+                          setAuthenticatedStudent(selectedForLogin);
+                        } else {
+                          setLoginError(true);
+                          setPinInput('');
+                          setTimeout(() => setLoginError(false), 2000);
+                        }
+                      } else if (pinInput.length < 4 && typeof num === 'number') {
+                        setPinInput(prev => prev + num);
+                      }
+                    }}
+                    className={cn(
+                      "h-14 rounded-2xl flex items-center justify-center font-anybody text-xl font-bold transition-all active:scale-90",
+                      num === '✓' ? "bg-primary-container text-on-primary-container" : "bg-white/5 border border-white/5 hover:bg-white/10"
+                    )}
+                  >
+                    {num === 'X' ? <X className="w-5 h-5" /> : num}
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => {
+                  setLoginStage('SELECT');
+                  setPinInput('');
+                }}
+                className="text-[10px] text-outline uppercase font-bold tracking-widest hover:text-primary transition-colors"
+              >
+                Voltar para seleção
+              </button>
+
+              {loginError && (
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-400 text-xs font-bold uppercase tracking-tight absolute inset-x-0 -bottom-10"
+                >
+                  PIN INCORRETO
+                </motion.p>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+
   return (
     <div className="min-h-screen bg-background pb-32 overflow-x-hidden">
+      <AnimatePresence>
+        {!authenticatedStudent && renderLogin()}
+      </AnimatePresence>
+
       {/* Header */}
-      <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-5 h-16">
+      <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-5 h-20">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary-container text-on-primary-container">
-            <Dumbbell className="w-5 h-5" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-container text-on-primary-container">
+            <Dumbbell className="w-6 h-6" />
           </div>
-          <h1 className="font-anybody font-extrabold text-xl tracking-tighter text-primary uppercase">
-            Volt Performance
-          </h1>
+          <div className="flex flex-col">
+            <h1 className="font-anybody font-black text-2xl tracking-tighter text-primary uppercase leading-tight">
+              TREINO FOFO
+            </h1>
+            {authenticatedStudent && (
+              <p className="text-[10px] font-lexend font-bold text-outline uppercase tracking-widest -mt-1">
+                Aluno: {authenticatedStudent.name}
+              </p>
+            )}
+          </div>
         </div>
+
+        {authenticatedStudent && (
+          <button 
+            onClick={() => {
+              setAuthenticatedStudent(null);
+              setLoginStage('SELECT');
+              setPinInput('');
+            }}
+            className="flex flex-col items-center gap-1 group"
+          >
+            <div className="p-2 rounded-xl bg-white/5 border border-white/10 group-active:scale-95 transition-all">
+              <LogOut className="w-5 h-5 text-outline group-hover:text-red-400" />
+            </div>
+            <span className="text-[8px] font-bold text-outline group-hover:text-red-400 uppercase tracking-widest">Sair</span>
+          </button>
+        )}
       </header>
 
       <main className="mt-20 px-5 max-w-2xl mx-auto">

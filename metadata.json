@@ -1,6 +1,6 @@
 {
-  "name": "Volt Performance",
-  "description": "Rastreamento de fitness de alta performance com uma estética de alto contraste.",
+  "name": "TREINO FOFO",
+  "description": "App de treino personalizado com foco em fotos e acompanhamento de alunos.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
