@@ -9,7 +9,7 @@ import {
   Check, 
   Home, 
   PlusCircle, 
-  BarChart2,
+  Settings,
   Dumbbell,
   LayoutGrid,
   CalendarDays,
@@ -47,6 +47,13 @@ interface WorkoutLog {
   };
 }
 
+interface Student {
+  id: string;
+  name: string;
+  pin: string;
+  avatar: string;
+}
+
 // --- Initial Data ---
 
 const INITIAL_GROUPS: Group[] = [
@@ -77,6 +84,14 @@ const INITIAL_PLAN: WorkoutPlan = {
 const WEEKDAYS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const SHORT_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
+const AVATARS = [
+  'https://picsum.photos/seed/user1/200/200',
+  'https://picsum.photos/seed/user2/200/200',
+  'https://picsum.photos/seed/user3/200/200',
+  'https://picsum.photos/seed/user4/200/200',
+  'https://picsum.photos/seed/user5/200/200',
+];
+
 // --- Components ---
 
 export default function VoltApp() {
@@ -101,6 +116,9 @@ export default function VoltApp() {
   // Form States
   const [newEx, setNewEx] = React.useState({ name: '', sets: 3, reps: '10', groupId: INITIAL_GROUPS[0]?.id || '', image: '' });
   const [newGroup, setNewGroup] = React.useState({ name: '', image: '' });
+  const [newStudent, setNewStudent] = React.useState({ name: '', pin: '', avatar: AVATARS[0] });
+
+  const [students, setStudents] = React.useState<Student[]>([]);
 
   // Image Preview State
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
@@ -536,15 +554,14 @@ export default function VoltApp() {
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="space-y-8 pb-10"
+      className="space-y-5 pb-10"
     >
       <section>
-        <h2 className="font-anybody font-bold text-3xl text-primary">Estatísticas</h2>
-        <p className="text-outline text-sm">Análise detalhada do seu progresso</p>
+        <h2 className="font-anybody font-bold text-3xl text-primary">CONFIGURAÇÕES</h2>
       </section>
 
-      <div className="grid grid-cols-1 gap-6">
-        <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem] space-y-4">
+      <div className="grid grid-cols-1 gap-3">
+        <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] space-y-3">
           <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Grupos Cadastrados</h3>
           <div className="flex flex-wrap gap-2">
             {groups.map(g => (
@@ -556,7 +573,7 @@ export default function VoltApp() {
           </div>
         </div>
 
-        <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem] space-y-4">
+        <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] space-y-3">
           <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Exercícios Cadastrados</h3>
           <div className="space-y-2">
             {exercises.map(e => (
@@ -571,7 +588,7 @@ export default function VoltApp() {
           </div>
         </div>
 
-        <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem] space-y-4">
+        <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] space-y-3">
           <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Volume de Carga (kg)</h3>
           <div className="h-48 flex items-end justify-between gap-2 px-2">
             {[30, 45, 60, 80, 75, 90, 85, 100].map((h, i) => (
@@ -590,7 +607,7 @@ export default function VoltApp() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem]">
             <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Total de Sets</p>
             <p className="font-anybody font-bold text-3xl text-primary">124</p>
@@ -599,6 +616,88 @@ export default function VoltApp() {
             <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Recordes Pessoais</p>
             <p className="font-anybody font-bold text-3xl text-secondary-container">12</p>
           </div>
+        </div>
+
+        {/* Cadastro de Alunos */}
+        <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem] space-y-6">
+          <div className="flex items-center gap-2">
+            <PlusCircle className="w-5 h-5 text-primary-container" />
+            <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest">Cadastrar Novo Aluno</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[10px] text-outline uppercase font-bold tracking-widest">Nome do Aluno</label>
+              <input 
+                type="text" 
+                placeholder="Ex: João Silva..." 
+                value={newStudent.name}
+                onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
+                className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary-container outline-none transition-all"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] text-outline uppercase font-bold tracking-widest">PIN de Acesso (4 dígitos)</label>
+              <input 
+                type="password" 
+                maxLength={4}
+                placeholder="****" 
+                value={newStudent.pin}
+                onChange={e => setNewStudent({ ...newStudent, pin: e.target.value.replace(/\D/g, '') })}
+                className="w-full bg-background border border-white/10 rounded-xl p-3 text-sm focus:border-primary-container outline-none tracking-[0.5em] text-center"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] text-outline uppercase font-bold tracking-widest block">Escolha um Avatar</label>
+              <div className="flex justify-between items-center bg-background/50 p-3 rounded-2xl border border-white/5">
+                {AVATARS.map((avatar, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setNewStudent({ ...newStudent, avatar })}
+                    className={cn(
+                      "relative w-10 h-10 rounded-full overflow-hidden border-2 transition-all",
+                      newStudent.avatar === avatar ? "border-primary-container scale-110 shadow-lg" : "border-transparent opacity-40 hover:opacity-80"
+                    )}
+                  >
+                    <Image src={avatar} alt={`Avatar ${idx}`} fill className="object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button 
+              onClick={() => {
+                if (newStudent.name && newStudent.pin.length === 4) {
+                  setStudents([...students, { ...newStudent, id: Date.now().toString() }]);
+                  setNewStudent({ name: '', pin: '', avatar: AVATARS[0] });
+                }
+              }}
+              className="w-full bg-primary-container text-on-primary-container font-extrabold py-4 rounded-xl shadow-[0_0_20px_rgba(195,244,0,0.3)] active:scale-95 transition-all mt-4"
+            >
+              CADASTRAR ALUNO
+            </button>
+          </div>
+
+          {students.length > 0 && (
+            <div className="pt-6 border-t border-white/5 space-y-4">
+              <h4 className="text-[10px] text-outline uppercase font-bold tracking-widest">Alunos Ativos</h4>
+              <div className="space-y-2">
+                {students.map(student => (
+                  <div key={student.id} className="flex items-center gap-3 bg-white/5 p-3 rounded-2xl border border-white/5">
+                    <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/10">
+                      <Image src={student.avatar} alt={student.name} fill className="object-cover" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{student.name}</p>
+                      <p className="text-[10px] text-outline uppercase font-semibold">PIN: ****</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -736,7 +835,7 @@ export default function VoltApp() {
             activeView === 'stats' ? "text-primary-container" : "text-outline hover:text-primary"
           )}
         >
-          <BarChart2 className="w-7 h-7" />
+          <Settings className="w-7 h-7" />
         </button>
       </nav>
     </div>
