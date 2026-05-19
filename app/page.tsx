@@ -87,7 +87,16 @@ export default function VoltApp() {
   const [logs, setLogs] = React.useState<WorkoutLog>({});
   
   // Date State for Calendar View
-  const [selectedDate, setSelectedDate] = React.useState(new Date());
+  const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSelectedDate(new Date());
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   // Form States
   const [newEx, setNewEx] = React.useState({ name: '', sets: 3, reps: '10', groupId: INITIAL_GROUPS[0]?.id || '', image: '' });
@@ -96,6 +105,10 @@ export default function VoltApp() {
   // Image Preview State
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
 
+  const [showConfirm, setShowConfirm] = React.useState(false);
+
+  if (!mounted || !selectedDate) return <div className="min-h-screen bg-background" />;
+
   const getDayName = (date: Date) => {
     const day = date.getDay(); // 0 is Sunday
     const index = day === 0 ? 6 : day - 1;
@@ -103,40 +116,46 @@ export default function VoltApp() {
   };
 
   const formatDateKey = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const toggleExercise = (exerciseId: string) => {
     const dateKey = formatDateKey(selectedDate);
-    const dayData = logs[dateKey] || { exercises: {} };
     
-    if (dayData.finished) return;
+    setLogs(prev => {
+      const dayData = prev[dateKey] || { exercises: {} };
+      if (dayData.finished) return prev;
 
-    setLogs(prev => ({
-      ...prev,
-      [dateKey]: {
-        ...dayData,
-        exercises: {
-          ...dayData.exercises,
-          [exerciseId]: !dayData.exercises[exerciseId]
+      return {
+        ...prev,
+        [dateKey]: {
+          ...dayData,
+          exercises: {
+            ...dayData.exercises,
+            [exerciseId]: !dayData.exercises[exerciseId]
+          }
         }
-      }
-    }));
+      };
+    });
   };
 
   const finishWorkout = () => {
     const dateKey = formatDateKey(selectedDate);
-    const dayData = logs[dateKey] || { exercises: {} };
     
-    if (confirm('Deseja realmente finalizar o treino? Após finalizar, não será possível alterar os exercícios.')) {
-      setLogs(prev => ({
+    setLogs(prev => {
+      const dayData = prev[dateKey] || { exercises: {} };
+      return {
         ...prev,
         [dateKey]: {
           ...dayData,
           finished: true
         }
-      }));
-    }
+      };
+    });
+    setShowConfirm(false);
   };
 
   // --- Views ---
@@ -146,22 +165,31 @@ export default function VoltApp() {
       initial={{ opacity: 0, x: -20 }} 
       animate={{ opacity: 1, x: 0 }} 
       exit={{ opacity: 0, x: 20 }}
-      className="space-y-8"
+      className="space-y-4"
     >
       <section>
-        <h2 className="font-anybody font-bold text-3xl text-primary">Dashboard</h2>
-        <p className="text-outline text-sm">Seu desempenho semanal</p>
+        <h2 className="font-anybody font-bold text-3xl text-primary leading-tight">Dashboard</h2>
+        <p className="text-outline text-xs">Seu desempenho semanal</p>
       </section>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-2.5">
         {/* Treinos da Semana */}
-        <div className="bg-surface-container border border-white/5 p-6 rounded-[2rem]">
-          <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest mb-4">Status Semanal</h3>
+        <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem]">
+          <h3 className="font-lexend font-semibold text-sm text-outline uppercase tracking-widest mb-3">Status Semanal</h3>
           <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {SHORT_DAYS.map((day, i) => {
               const dayName = WEEKDAYS[i];
               const hasGroup = plan[dayName];
-              const isCompleted = Math.random() > 0.5; // Mocking visual check
+              
+              // Calculate the date for this weekday in the current week
+              const now = new Date();
+              const currentDay = now.getDay(); // 0-6
+              const diff = (i + 1) - (currentDay === 0 ? 7 : currentDay);
+              const d = new Date(now);
+              d.setDate(now.getDate() + diff);
+              const dateKey = formatDateKey(d);
+              
+              const isCompleted = logs[dateKey]?.finished;
               return (
                 <div key={day} className="flex flex-col items-center gap-2">
                   <div className={cn(
@@ -179,17 +207,17 @@ export default function VoltApp() {
         </div>
 
         {/* Média de Tempo etc */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem]">
-            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-2">Média Semanal</p>
+            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Média Semanal</p>
             <p className="font-anybody font-bold text-2xl text-primary">54m</p>
           </div>
           <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem]">
-            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-2">Média Mensal</p>
+            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Média Mensal</p>
             <p className="font-anybody font-bold text-2xl text-secondary-container">51m</p>
           </div>
           <div className="bg-surface-container border border-white/5 p-5 rounded-[2rem] col-span-2">
-            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-2">Dias Ausentes (Mês)</p>
+            <p className="font-lexend text-[10px] text-outline uppercase font-bold tracking-widest mb-1">Dias Ausentes (Mês)</p>
             <div className="flex items-end gap-2">
               <p className="font-anybody font-bold text-4xl text-primary">04</p>
               <span className="text-outline text-xs mb-1">dias</span>
@@ -274,8 +302,11 @@ export default function VoltApp() {
                 <motion.div
                   layout
                   key={exercise.id}
-                  onClick={() => toggleExercise(exercise.id)}
-                  className="workout-card-glow bg-surface-container-high p-4 rounded-xl border border-white/5 flex items-center gap-4 relative overflow-hidden cursor-pointer group hover:border-white/10 transition-all"
+                  onClick={() => !isFinished && toggleExercise(exercise.id)}
+                  className={cn(
+                    "workout-card-glow bg-surface-container-high p-4 rounded-xl border border-white/5 flex items-center gap-4 relative overflow-hidden transition-all",
+                    isFinished ? "cursor-default opacity-80" : "cursor-pointer group hover:border-white/10"
+                  )}
                 >
                   {dayLogs[exercise.id] && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-primary-container" />
@@ -318,7 +349,7 @@ export default function VoltApp() {
               ))}
 
               <button 
-                onClick={finishWorkout}
+                onClick={() => setShowConfirm(true)}
                 disabled={completedCount < dayExercises.length || isFinished}
                 className={cn(
                   "w-full py-4 rounded-xl font-bold uppercase tracking-widest transition-all",
@@ -346,15 +377,15 @@ export default function VoltApp() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }} 
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-12 pb-40"
+        className="space-y-6 pb-40"
       >
-        <section>
+        <section className="mb-2">
           <h2 className="font-anybody font-bold text-3xl text-primary uppercase">PERSONALIZAÇÃO</h2>
         </section>
 
         {/* Montar Treino da Semana */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 mb-1">
             <CalendarDays className="w-5 h-5 text-primary-container" />
             <h3 className="font-lexend font-bold text-lg">Cronograma Semanal</h3>
           </div>
@@ -596,7 +627,43 @@ export default function VoltApp() {
         </AnimatePresence>
       </main>
 
-      {/* Image Overlay */}
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-5"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-surface-container border border-white/10 p-8 rounded-[2rem] w-full max-w-sm text-center space-y-6"
+            >
+              <div className="w-16 h-16 bg-primary-container/20 rounded-full flex items-center justify-center mx-auto">
+                <Dumbbell className="w-8 h-8 text-primary-container" />
+              </div>
+              <h3 className="font-lexend font-bold text-xl">Deseja finalizar o treino?</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setShowConfirm(false)}
+                  className="py-3 px-6 rounded-xl border border-white/10 font-bold hover:bg-white/5 transition-colors"
+                >
+                  NÃO
+                </button>
+                <button 
+                  onClick={finishWorkout}
+                  className="py-3 px-6 rounded-xl bg-primary-container text-on-primary-container font-extrabold shadow-[0_0_15px_rgba(195,244,0,0.3)] active:scale-95 transition-all"
+                >
+                  SIM
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {selectedImage && (
           <motion.div 
