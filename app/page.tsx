@@ -141,6 +141,121 @@ export default function VoltApp() {
   const [pinInput, setPinInput] = React.useState('');
   const [loginError, setLoginError] = React.useState(false);
 
+  const [isDataLoaded, setIsDataLoaded] = React.useState(false);
+
+  // 1. Load students list on mount or when changed
+  React.useEffect(() => {
+    if (!mounted) return;
+    const cachedStudents = localStorage.getItem('treinofofo_students');
+    if (cachedStudents) {
+      try {
+        const parsed = JSON.parse(cachedStudents);
+        if (Array.isArray(parsed)) {
+          setTimeout(() => {
+            setStudents(parsed);
+          }, 0);
+        }
+      } catch (e) {
+        console.error('Error loading students from localStorage', e);
+      }
+    }
+  }, [mounted]);
+
+  // Save general students list to localStorage
+  React.useEffect(() => {
+    if (!mounted) return;
+    localStorage.setItem('treinofofo_students', JSON.stringify(students));
+  }, [students, mounted]);
+
+  // 2. Load or reset student-specific data from localStorage whenever authenticatedStudent changes
+  React.useEffect(() => {
+    if (!mounted) return;
+    setTimeout(() => {
+      if (authenticatedStudent) {
+        setIsDataLoaded(false);
+        const sId = authenticatedStudent.id;
+
+        // Groups
+        let loadedGroups = INITIAL_GROUPS;
+        try {
+          const cached = localStorage.getItem(`treinofofo_groups_${sId}`);
+          if (cached) loadedGroups = JSON.parse(cached);
+        } catch (e) {
+          console.error(e);
+        }
+        setGroups(loadedGroups);
+
+        // Exercises
+        let loadedExercises = INITIAL_EXERCISES;
+        try {
+          const cached = localStorage.getItem(`treinofofo_exercises_${sId}`);
+          if (cached) loadedExercises = JSON.parse(cached);
+        } catch (e) {
+          console.error(e);
+        }
+        setExercises(loadedExercises);
+
+        // Plan
+        let loadedPlan = INITIAL_PLAN;
+        try {
+          const cached = localStorage.getItem(`treinofofo_plan_${sId}`);
+          if (cached) loadedPlan = JSON.parse(cached);
+        } catch (e) {
+          console.error(e);
+        }
+        setPlan(loadedPlan);
+
+        // Logs
+        let loadedLogs = {};
+        try {
+          const cached = localStorage.getItem(`treinofofo_logs_${sId}`);
+          if (cached) loadedLogs = JSON.parse(cached);
+        } catch (e) {
+          console.error(e);
+        }
+        setLogs(loadedLogs);
+
+        setIsDataLoaded(true);
+      } else {
+        setIsDataLoaded(false);
+        setGroups(INITIAL_GROUPS);
+        setExercises(INITIAL_EXERCISES);
+        setPlan(INITIAL_PLAN);
+        setLogs({});
+      }
+    }, 0);
+  }, [authenticatedStudent, mounted]);
+
+  // 3. Save student-specific states to localStorage dynamically only when fully loaded
+  React.useEffect(() => {
+    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    localStorage.setItem(`treinofofo_groups_${authenticatedStudent.id}`, JSON.stringify(groups));
+  }, [groups, authenticatedStudent, mounted, isDataLoaded]);
+
+  React.useEffect(() => {
+    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    localStorage.setItem(`treinofofo_exercises_${authenticatedStudent.id}`, JSON.stringify(exercises));
+  }, [exercises, authenticatedStudent, mounted, isDataLoaded]);
+
+  React.useEffect(() => {
+    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    localStorage.setItem(`treinofofo_plan_${authenticatedStudent.id}`, JSON.stringify(plan));
+  }, [plan, authenticatedStudent, mounted, isDataLoaded]);
+
+  React.useEffect(() => {
+    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    localStorage.setItem(`treinofofo_logs_${authenticatedStudent.id}`, JSON.stringify(logs));
+  }, [logs, authenticatedStudent, mounted, isDataLoaded]);
+
+  // Keep first option of newEx synced with current active groups to avoid selector mismatch
+  React.useEffect(() => {
+    if (groups && groups.length > 0) {
+      setTimeout(() => {
+        setNewEx(prev => ({ ...prev, groupId: groups[0].id }));
+      }, 0);
+    }
+  }, [groups]);
+
   if (!mounted || !selectedDate) return <div className="min-h-screen bg-background" />;
 
   const getDayName = (date: Date) => {
