@@ -122,6 +122,7 @@ export default function VoltApp() {
   
   const [isNeonEnabled, setIsNeonEnabled] = React.useState(false);
   const [isNeonConnecting, setIsNeonConnecting] = React.useState(true);
+  const [neonConnectionError, setNeonConnectionError] = React.useState<string | null>(null);
   
   // Date State for Calendar View
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
@@ -170,6 +171,7 @@ export default function VoltApp() {
         const data = await response.json();
         if (data.success && data.configured) {
           setIsNeonEnabled(true);
+          setNeonConnectionError(null);
           const stRes = await fetch('/api/db', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -181,9 +183,12 @@ export default function VoltApp() {
             setIsNeonConnecting(false);
             return;
           }
+        } else if (data.configured && data.error) {
+          setNeonConnectionError(data.error);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Error initializing Neon connection:', e);
+        setNeonConnectionError(e.message || 'Erro de rede ao conectar com o banco.');
       }
       
       // Fallback
@@ -1078,6 +1083,25 @@ export default function VoltApp() {
       </div>
 
       <div className="w-full max-w-sm space-y-6">
+        {neonConnectionError && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-red-950/40 border border-red-500/30 text-start space-y-2 shadow-2xl"
+          >
+            <div className="flex items-center gap-2 text-red-400">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              <h4 className="text-xs font-black uppercase tracking-wider">Atenção: Configuração com Neon</h4>
+            </div>
+            <p className="text-xs text-red-200/95 leading-relaxed font-semibold">
+              {neonConnectionError}
+            </p>
+            <div className="text-[10px] text-red-300/80 leading-normal font-mono bg-black/30 p-2 rounded-lg">
+              Dica: Copie a <strong className="text-primary">Connection String</strong> PostgreSQL no Neon (começando com <code className="text-white">postgresql://</code> ou <code className="text-white">postgres://</code>) em vez de links HTTP ou REST.
+            </div>
+          </motion.div>
+        )}
+
         <AnimatePresence mode="wait">
           {loginStage === 'SELECT' ? (
             <motion.div 
@@ -1221,11 +1245,16 @@ export default function VoltApp() {
                 TREINO FOFO
               </h1>
               {isNeonConnecting ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" title="Conectando..." />
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse cursor-help" title="Verificando conexão com o banco de dados..." />
               ) : isNeonEnabled ? (
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)] animate-pulse" title="Banco Neon Sincronizado" />
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)] animate-pulse cursor-help" title="Conectado ao Banco Neon Sincronizado!" />
+              ) : neonConnectionError ? (
+                <span 
+                  className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)] animate-pulse cursor-help" 
+                  title={`Erro no Neon: ${neonConnectionError}`}
+                />
               ) : (
-                <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 hover:bg-neutral-500 transition-colors" title="Armazenamento Local (Offline)" />
+                <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 hover:bg-neutral-500 transition-colors cursor-help" title="Usando Armazenamento Local (Offline)" />
               )}
             </div>
             {authenticatedStudent && (

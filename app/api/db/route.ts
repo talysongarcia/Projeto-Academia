@@ -12,6 +12,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (databaseUrl.trim().startsWith('http://') || databaseUrl.trim().startsWith('https://')) {
+      return NextResponse.json({ 
+        success: false, 
+        configured: true, 
+        error: 'Você informou o link HTTP da API REST do Neon. Por favor, substitua-o nas Secrets pelo formato "Connection String" do PostgreSQL (que começa com "postgresql://" ou "postgres://").' 
+      });
+    }
+
     const { action, ...args } = await req.json();
     const sql = neon(databaseUrl);
 
