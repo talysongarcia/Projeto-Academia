@@ -103,12 +103,25 @@ const AVATARS = [
 
 // --- Components ---
 
+function generateUUID() {
+  if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 export default function VoltApp() {
   const [activeView, setActiveView] = React.useState<'home' | 'calendar' | 'add' | 'stats'>('calendar');
   const [groups, setGroups] = React.useState<Group[]>(INITIAL_GROUPS);
   const [exercises, setExercises] = React.useState<Exercise[]>(INITIAL_EXERCISES);
   const [plan, setPlan] = React.useState<WorkoutPlan>(INITIAL_PLAN);
   const [logs, setLogs] = React.useState<WorkoutLog>({});
+  
+  const [isNeonEnabled, setIsNeonEnabled] = React.useState(false);
+  const [isNeonConnecting, setIsNeonConnecting] = React.useState(true);
   
   // Date State for Calendar View
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
@@ -143,76 +156,120 @@ export default function VoltApp() {
 
   const [isDataLoaded, setIsDataLoaded] = React.useState(false);
 
-  // 1. Load students list on mount or when changed
+  // 1. Load students list and check Neon configuration on mount
   React.useEffect(() => {
     if (!mounted) return;
-    const cachedStudents = localStorage.getItem('treinofofo_students');
-    if (cachedStudents) {
+    
+    const initializeApp = async () => {
       try {
-        const parsed = JSON.parse(cachedStudents);
-        if (Array.isArray(parsed)) {
-          setTimeout(() => {
-            setStudents(parsed);
-          }, 0);
+        const response = await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check-connection' })
+        });
+        const data = await response.json();
+        if (data.success && data.configured) {
+          setIsNeonEnabled(true);
+          const stRes = await fetch('/api/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'list-students' })
+          });
+          const stData = await stRes.json();
+          if (stData.success && Array.isArray(stData.students)) {
+            setStudents(stData.students);
+            setIsNeonConnecting(false);
+            return;
+          }
         }
       } catch (e) {
-        console.error('Error loading students from localStorage', e);
+        console.error('Error initializing Neon connection:', e);
       }
-    }
+      
+      // Fallback
+      setIsNeonEnabled(false);
+      setIsNeonConnecting(false);
+      const cachedStudents = localStorage.getItem('treinofofo_students');
+      if (cachedStudents) {
+        try {
+          const parsed = JSON.parse(cachedStudents);
+          if (Array.isArray(parsed)) {
+            setStudents(parsed);
+          }
+        } catch (e) {
+          console.error('Error loading students from localStorage', e);
+        }
+      }
+    };
+
+    initializeApp();
   }, [mounted]);
 
-  // Save general students list to localStorage
+  // Save general students list to localStorage (only when not synced with Neon)
   React.useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isNeonEnabled) return;
     localStorage.setItem('treinofofo_students', JSON.stringify(students));
-  }, [students, mounted]);
+  }, [students, mounted, isNeonEnabled]);
 
-  // 2. Load or reset student-specific data from localStorage whenever authenticatedStudent changes
+  // 2. Load or reset student-specific data from localStorage or Neon Database
   React.useEffect(() => {
     if (!mounted) return;
-    setTimeout(() => {
+    
+    const loadStudentData = async () => {
       if (authenticatedStudent) {
         setIsDataLoaded(false);
         const sId = authenticatedStudent.id;
 
-        // Groups
+        if (isNeonEnabled) {
+          try {
+            const res = await fetch('/api/db', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'get-student-data', studentId: sId })
+            });
+            const data = await res.json();
+            if (data.success) {
+              setGroups(data.groups || []);
+              setExercises(data.exercises || []);
+              setPlan(data.plan || {
+                'Segunda': '', 'Terça': '', 'Quarta': '', 'Quinta': '', 'Sexta': '', 'Sábado': '', 'Domingo': ''
+              });
+              setLogs(data.logs || {});
+              setIsDataLoaded(true);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to load data from Neon, using local storage fallback...', e);
+          }
+        }
+
+        // Local storage cache fallback
         let loadedGroups = INITIAL_GROUPS;
         try {
           const cached = localStorage.getItem(`treinofofo_groups_${sId}`);
           if (cached) loadedGroups = JSON.parse(cached);
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setGroups(loadedGroups);
 
-        // Exercises
         let loadedExercises = INITIAL_EXERCISES;
         try {
           const cached = localStorage.getItem(`treinofofo_exercises_${sId}`);
           if (cached) loadedExercises = JSON.parse(cached);
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setExercises(loadedExercises);
 
-        // Plan
         let loadedPlan = INITIAL_PLAN;
         try {
           const cached = localStorage.getItem(`treinofofo_plan_${sId}`);
           if (cached) loadedPlan = JSON.parse(cached);
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setPlan(loadedPlan);
 
-        // Logs
         let loadedLogs = {};
         try {
           const cached = localStorage.getItem(`treinofofo_logs_${sId}`);
           if (cached) loadedLogs = JSON.parse(cached);
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         setLogs(loadedLogs);
 
         setIsDataLoaded(true);
@@ -223,29 +280,31 @@ export default function VoltApp() {
         setPlan(INITIAL_PLAN);
         setLogs({});
       }
-    }, 0);
-  }, [authenticatedStudent, mounted]);
+    };
 
-  // 3. Save student-specific states to localStorage dynamically only when fully loaded
+    loadStudentData();
+  }, [authenticatedStudent, mounted, isNeonEnabled]);
+
+  // 3. Save student-specific states to localStorage dynamically only when fully loaded (only if Neon is not handling it)
   React.useEffect(() => {
-    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    if (!mounted || !authenticatedStudent || !isDataLoaded || isNeonEnabled) return;
     localStorage.setItem(`treinofofo_groups_${authenticatedStudent.id}`, JSON.stringify(groups));
-  }, [groups, authenticatedStudent, mounted, isDataLoaded]);
+  }, [groups, authenticatedStudent, mounted, isDataLoaded, isNeonEnabled]);
 
   React.useEffect(() => {
-    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    if (!mounted || !authenticatedStudent || !isDataLoaded || isNeonEnabled) return;
     localStorage.setItem(`treinofofo_exercises_${authenticatedStudent.id}`, JSON.stringify(exercises));
-  }, [exercises, authenticatedStudent, mounted, isDataLoaded]);
+  }, [exercises, authenticatedStudent, mounted, isDataLoaded, isNeonEnabled]);
 
   React.useEffect(() => {
-    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    if (!mounted || !authenticatedStudent || !isDataLoaded || isNeonEnabled) return;
     localStorage.setItem(`treinofofo_plan_${authenticatedStudent.id}`, JSON.stringify(plan));
-  }, [plan, authenticatedStudent, mounted, isDataLoaded]);
+  }, [plan, authenticatedStudent, mounted, isDataLoaded, isNeonEnabled]);
 
   React.useEffect(() => {
-    if (!mounted || !authenticatedStudent || !isDataLoaded) return;
+    if (!mounted || !authenticatedStudent || !isDataLoaded || isNeonEnabled) return;
     localStorage.setItem(`treinofofo_logs_${authenticatedStudent.id}`, JSON.stringify(logs));
-  }, [logs, authenticatedStudent, mounted, isDataLoaded]);
+  }, [logs, authenticatedStudent, mounted, isDataLoaded, isNeonEnabled]);
 
   // Keep first option of newEx synced with current active groups to avoid selector mismatch
   React.useEffect(() => {
@@ -278,7 +337,7 @@ export default function VoltApp() {
       const dayData = prev[dateKey] || { exercises: {} };
       if (dayData.finished) return prev;
 
-      return {
+      const newLogs = {
         ...prev,
         [dateKey]: {
           ...dayData,
@@ -288,6 +347,24 @@ export default function VoltApp() {
           }
         }
       };
+
+      if (isNeonEnabled && authenticatedStudent) {
+        const targetLog = newLogs[dateKey];
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save-log',
+            studentId: authenticatedStudent.id,
+            date: dateKey,
+            finished: targetLog.finished || false,
+            finishedAt: targetLog.finishedAt || null,
+            exercises: targetLog.exercises
+          })
+        }).catch(err => console.error('Failed to sync toggle to Neon:', err));
+      }
+
+      return newLogs;
     });
   };
 
@@ -296,23 +373,68 @@ export default function VoltApp() {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const dateStr = now.toLocaleDateString('pt-BR');
+    const finishedAtStr = `${dateStr} às ${timeStr}`;
     
     setLogs(prev => {
       const dayData = prev[dateKey] || { exercises: {} };
-      return {
+      const newLogs = {
         ...prev,
         [dateKey]: {
           ...dayData,
           finished: true,
-          finishedAt: `${dateStr} às ${timeStr}`
+          finishedAt: finishedAtStr
         }
       };
+
+      if (isNeonEnabled && authenticatedStudent) {
+        const targetLog = newLogs[dateKey];
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save-log',
+            studentId: authenticatedStudent.id,
+            date: dateKey,
+            finished: true,
+            finishedAt: finishedAtStr,
+            exercises: targetLog.exercises
+          })
+        }).catch(err => console.error('Failed to sync finish to Neon:', err));
+      }
+
+      return newLogs;
     });
     setShowConfirm(false);
   };
 
-  const savePlan = () => {
-    setSaveStatus("Treino alterado com sucesso");
+  const savePlan = async () => {
+    if (isNeonEnabled && authenticatedStudent) {
+      setSaveStatus("Salvando no Neon...");
+      try {
+        for (const [day, groupId] of Object.entries(plan)) {
+          await fetch('/api/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'save-plan', 
+              studentId: authenticatedStudent.id, 
+              dayOfWeek: day, 
+              groupId: groupId || null
+            })
+          });
+        }
+        setSaveStatus("Treino alterado no Neon!");
+      } catch (err) {
+        console.error('Error saving plan to Neon:', err);
+        setSaveStatus("Erro ao salvar no banco");
+      }
+    } else {
+      setSaveStatus("Treino alterado com sucesso localmente");
+    }
+    
+    if (authenticatedStudent) {
+      localStorage.setItem(`treinofofo_plan_${authenticatedStudent.id}`, JSON.stringify(plan));
+    }
     setTimeout(() => setSaveStatus(null), 3000);
   };
 
@@ -621,9 +743,30 @@ export default function VoltApp() {
               />
             </div>
             <button 
-              onClick={() => {
-                if (newGroup.name) {
-                  setGroups([...groups, { id: Date.now().toString(), name: newGroup.name }]);
+              onClick={async () => {
+                if (newGroup.name && authenticatedStudent) {
+                  const newId = generateUUID();
+                  const groupPayload = { id: newId, name: newGroup.name };
+                  
+                  if (isNeonEnabled) {
+                    try {
+                      await fetch('/api/db', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'save-group',
+                          id: newId,
+                          studentId: authenticatedStudent.id,
+                          name: newGroup.name,
+                          image: null
+                        })
+                      });
+                    } catch (err) {
+                      console.error('Error saving group to Neon:', err);
+                    }
+                  }
+                  
+                  setGroups([...groups, groupPayload]);
                   setNewGroup({ name: '', image: '' });
                 }
               }}
@@ -716,9 +859,33 @@ export default function VoltApp() {
               </select>
             </div>
             <button 
-              onClick={() => {
-                if (newEx.name && newEx.groupId) {
-                  setExercises([...exercises, { ...newEx, id: Date.now().toString() }]);
+              onClick={async () => {
+                if (newEx.name && newEx.groupId && authenticatedStudent) {
+                  const newId = generateUUID();
+                  const exercisePayload = { ...newEx, id: newId };
+                  
+                  if (isNeonEnabled) {
+                    try {
+                      await fetch('/api/db', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'save-exercise',
+                          id: newId,
+                          studentId: authenticatedStudent.id,
+                          groupId: newEx.groupId,
+                          name: newEx.name,
+                          sets: newEx.sets,
+                          reps: newEx.reps,
+                          image: newEx.image || null
+                        })
+                      });
+                    } catch (err) {
+                      console.error('Error saving exercise to Neon:', err);
+                    }
+                  }
+                  
+                  setExercises([...exercises, exercisePayload]);
                   setNewEx({ name: '', sets: 3, reps: '10', groupId: groups[0]?.id || '', image: '' });
                 }
               }}
@@ -839,9 +1006,29 @@ export default function VoltApp() {
             </div>
 
             <button 
-              onClick={() => {
+              onClick={async () => {
                 if (newStudent.name && newStudent.pin.length === 4) {
-                  setStudents([...students, { ...newStudent, id: Date.now().toString() }]);
+                  const newId = generateUUID();
+                  const studentPayload = { ...newStudent, id: newId };
+                  
+                  if (isNeonEnabled) {
+                    try {
+                      const res = await fetch('/api/db', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'create-student', ...studentPayload })
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        setStudents([...students, data.student]);
+                      }
+                    } catch (err) {
+                      console.error('Error creating student on Neon:', err);
+                    }
+                  } else {
+                    setStudents([...students, studentPayload]);
+                  }
+                  
                   setNewStudent({ name: '', pin: '', avatar: AVATARS[0] });
                 }
               }}
@@ -1029,9 +1216,18 @@ export default function VoltApp() {
             <Dumbbell className="w-6 h-6" />
           </div>
           <div className="flex flex-col">
-            <h1 className="font-anybody font-black text-2xl tracking-tighter text-primary uppercase leading-tight">
-              TREINO FOFO
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-anybody font-black text-2xl tracking-tighter text-primary uppercase leading-tight">
+                TREINO FOFO
+              </h1>
+              {isNeonConnecting ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" title="Conectando..." />
+              ) : isNeonEnabled ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.8)] animate-pulse" title="Banco Neon Sincronizado" />
+              ) : (
+                <span className="w-1.5 h-1.5 rounded-full bg-neutral-600 hover:bg-neutral-500 transition-colors" title="Armazenamento Local (Offline)" />
+              )}
+            </div>
             {authenticatedStudent && (
               <p className="text-[10px] font-lexend font-bold text-outline uppercase tracking-widest -mt-1">
                 Aluno: {authenticatedStudent.name}

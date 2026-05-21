@@ -1,0 +1,298 @@
+{
+  "database": {
+    "id": "treinofofo",
+    "name": "Treino Fofo Database"
+  },
+  "collections": [
+    {
+      "id": "students",
+      "name": "Students",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "name",
+          "type": "string",
+          "size": 255,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "pin",
+          "type": "string",
+          "size": 10,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "avatar",
+          "type": "string",
+          "size": 1000,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "createdAt",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_pin",
+          "type": "unique",
+          "attributes": ["pin"]
+        }
+      ]
+    },
+    {
+      "id": "groups",
+      "name": "Muscle Groups",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "studentId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "size": 255,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "image",
+          "type": "string",
+          "size": 1000,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "createdAt",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_student",
+          "type": "key",
+          "attributes": ["studentId"]
+        }
+      ]
+    },
+    {
+      "id": "exercises",
+      "name": "Exercises",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "studentId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "groupId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "name",
+          "type": "string",
+          "size": 255,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "sets",
+          "type": "integer",
+          "required": true,
+          "array": false,
+          "default": 3
+        },
+        {
+          "key": "reps",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false,
+          "default": "10"
+        },
+        {
+          "key": "image",
+          "type": "string",
+          "size": 1000,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "createdAt",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_student",
+          "type": "key",
+          "attributes": ["studentId"]
+        },
+        {
+          "key": "idx_group",
+          "type": "key",
+          "attributes": ["groupId"]
+        }
+      ]
+    },
+    {
+      "id": "workout_plans",
+      "name": "Workout Plans",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "studentId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "dayOfWeek",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "groupId",
+          "type": "string",
+          "size": 36,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "updatedAt",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_student_day",
+          "type": "unique",
+          "attributes": ["studentId", "dayOfWeek"]
+        }
+      ]
+    },
+    {
+      "id": "workout_logs",
+      "name": "Workout Logs",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "studentId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "date",
+          "type": "string",
+          "size": 10,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "finished",
+          "type": "boolean",
+          "required": true,
+          "array": false,
+          "default": false
+        },
+        {
+          "key": "finishedAt",
+          "type": "string",
+          "size": 50,
+          "required": false,
+          "array": false
+        },
+        {
+          "key": "createdAt",
+          "type": "string",
+          "size": 50,
+          "required": true,
+          "array": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_student_date",
+          "type": "unique",
+          "attributes": ["studentId", "date"]
+        }
+      ]
+    },
+    {
+      "id": "workout_log_exercises",
+      "name": "Workout Log Exercises",
+      "documentSecurity": true,
+      "attributes": [
+        {
+          "key": "logId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "exerciseId",
+          "type": "string",
+          "size": 36,
+          "required": true,
+          "array": false
+        },
+        {
+          "key": "done",
+          "type": "boolean",
+          "required": true,
+          "array": false,
+          "default": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "idx_log_exercise",
+          "type": "unique",
+          "attributes": ["logId", "exerciseId"]
+        }
+      ]
+    }
+  ],
+  "storage": {
+    "buckets": [
+      {
+        "id": "exercise-images",
+        "name": "Exercise Images",
+        "maximumFileSize": 5242880,
+        "allowedFileExtensions": ["jpg", "png", "webp", "jpeg", "gif"],
+        "encryption": true
+      }
+    ]
+  }
+}
