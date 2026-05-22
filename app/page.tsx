@@ -148,6 +148,7 @@ export default function VoltApp() {
   const [showConfirm, setShowConfirm] = React.useState(false);
   const [selectedStudentId, setSelectedStudentId] = React.useState<string>('');
   const [saveStatus, setSaveStatus] = React.useState<string | null>(null);
+  const [exSuccessMsg, setExSuccessMsg] = React.useState<string | null>(null);
 
   const [authenticatedStudent, setAuthenticatedStudent] = React.useState<Student | null>(null);
   const [loginStage, setLoginStage] = React.useState<'SELECT' | 'PIN'>('SELECT');
@@ -892,12 +893,29 @@ export default function VoltApp() {
                   
                   setExercises([...exercises, exercisePayload]);
                   setNewEx({ name: '', sets: 3, reps: '10', groupId: groups[0]?.id || '', image: '' });
+                  setExSuccessMsg(`Exercício "${exercisePayload.name}" cadastrado com sucesso!`);
+                  setTimeout(() => {
+                    setExSuccessMsg(null);
+                  }, 4000);
                 }
               }}
               className="w-full bg-primary-container text-on-primary-container font-bold py-4 rounded-xl shadow-[0_0_15px_rgba(195,244,0,0.4)] active:scale-95 transition-all mt-4"
             >
               Cadastrar Exercício
             </button>
+            <AnimatePresence>
+              {exSuccessMsg && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-green-500/10 border border-green-500/20 text-green-400 p-3 rounded-xl text-center text-xs font-bold font-lexend flex items-center justify-center gap-2 mt-2"
+                >
+                  <Check className="w-4 h-4 shrink-0 text-green-400" />
+                  <span>{exSuccessMsg}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </section>
       </motion.div>
@@ -1073,8 +1091,15 @@ export default function VoltApp() {
       className="fixed inset-0 z-[200] bg-background flex flex-col items-center justify-center p-6 space-y-8"
     >
       <div className="text-center space-y-2">
-        <div className="w-20 h-20 bg-primary-container rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(195,244,0,0.2)]">
-          <Dumbbell className="w-10 h-10 text-on-primary-container" />
+        <div className="w-20 h-20 bg-primary-container rounded-3xl overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(195,244,0,0.2)]">
+          <Image 
+            src="/api/favicon" 
+            alt="Logo Volt Performance" 
+            width={80} 
+            height={80} 
+            className="w-full h-full object-cover" 
+            referrerPolicy="no-referrer"
+          />
         </div>
         <h1 className="font-anybody font-black text-4xl text-primary tracking-tighter uppercase leading-none">
           TREINO FOFO
@@ -1236,8 +1261,15 @@ export default function VoltApp() {
       {/* Header */}
       <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-5 h-20">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-container text-on-primary-container">
-            <Dumbbell className="w-6 h-6" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary-container overflow-hidden text-on-primary-container">
+            <Image 
+              src="/api/favicon" 
+              alt="Logo" 
+              width={40} 
+              height={40} 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
