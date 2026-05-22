@@ -18,12 +18,12 @@ const lexend = Lexend({
 });
 
 export const metadata: Metadata = {
-  title: 'Volt Performance',
-  description: 'Rastreamento de fitness de alta performance',
+  title: 'Treino Fofo',
+  description: 'Acompanhamento de treinos de alta performance',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Volt Performance',
+    title: 'Treino Fofo',
   },
   icons: {
     icon: '/api/favicon',
@@ -42,7 +42,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Volt Performance" />
+        <meta name="apple-mobile-web-app-title" content="Treino Fofo" />
         <link rel="apple-touch-icon" href="/api/favicon" />
       </head>
       <body

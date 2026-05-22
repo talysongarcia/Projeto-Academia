@@ -1094,7 +1094,7 @@ export default function VoltApp() {
         <div className="w-20 h-20 bg-primary-container rounded-3xl overflow-hidden flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(195,244,0,0.2)]">
           <Image 
             src="/api/favicon" 
-            alt="Logo Volt Performance" 
+            alt="Logo Treino Fofo" 
             width={80} 
             height={80} 
             className="w-full h-full object-cover" 
