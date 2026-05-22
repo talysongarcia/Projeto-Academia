@@ -12,7 +12,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (databaseUrl.trim().startsWith('http://') || databaseUrl.trim().startsWith('https://')) {
+    let cleanDbUrl = databaseUrl.trim();
+
+    // 1. Remove surrounding single/double quotes, trailing/leading backslashes, or brackets
+    cleanDbUrl = cleanDbUrl.replace(/^["'\\\[\(]+|["'\\\]\)]+$/g, '').trim();
+
+    // 2. Remove zero-width spaces, control characters, non-breaking spaces, or weird unicode spaces
+    cleanDbUrl = cleanDbUrl.replace(/[\x00-\x1F\x7F-\x9F\u200B-\u200D\uFEFF\u00A0]/g, '');
+
+    // 3. Remove all spaces, tabs, carriage returns, or newlines from the entire URL
+    cleanDbUrl = cleanDbUrl.replace(/\s+/g, '');
+
+    // 4. Standardize protocol to postgres://
+    if (cleanDbUrl.startsWith('postgresql://')) {
+      cleanDbUrl = 'postgres://' + cleanDbUrl.substring(13);
+    }
+
+    if (cleanDbUrl.startsWith('http://') || cleanDbUrl.startsWith('https://')) {
       return NextResponse.json({ 
         success: false, 
         configured: true, 
@@ -20,8 +36,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const urlForLog = cleanDbUrl.replace(/:[^:@]+@/, ':***@');
+    console.log('[Neon API] Raw databaseUrl length:', databaseUrl.length, '| Sanitized URL length:', cleanDbUrl.length, '| Sanitized URL:', urlForLog);
+
     const { action, ...args } = await req.json();
-    const sql = neon(databaseUrl);
+    const sql = neon(cleanDbUrl);
 
     if (action === 'check-connection') {
       try {
