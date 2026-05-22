@@ -20,6 +20,16 @@ const lexend = Lexend({
 export const metadata: Metadata = {
   title: 'Volt Performance',
   description: 'Rastreamento de fitness de alta performance',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Volt Performance',
+  },
+  icons: {
+    icon: '/api/favicon',
+    shortcut: '/api/favicon',
+    apple: '/api/favicon',
+  },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
@@ -30,6 +40,10 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block"
         />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Volt Performance" />
+        <link rel="apple-touch-icon" href="/api/favicon" />
       </head>
       <body
         className={`${inter.variable} ${anybody.variable} ${lexend.variable} font-lexend bg-[#131313] text-[#e5e2e1] antialiased`}

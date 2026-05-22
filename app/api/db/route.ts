@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 1. Groups
-      const groups = await sql`
+      let groups = await sql`
         SELECT id::text, name, image 
         FROM public.groups 
         WHERE student_id = ${studentId} 
@@ -100,12 +100,68 @@ export async function POST(req: NextRequest) {
       `;
 
       // 2. Exercises
-      const exercises = await sql`
+      let exercises = await sql`
         SELECT id::text, name, sets, reps, group_id::text as "groupId", image 
         FROM public.exercises 
         WHERE student_id = ${studentId} 
         ORDER BY name ASC
       `;
+
+      // Seed default groups and exercises if a newly synced or fresh student has 0 groups in Neon
+      if (groups.length === 0) {
+        try {
+          console.log(`[Neon SEED] Seeding default groups and exercises for studentId: ${studentId}`);
+          
+          const defaultGroups = [
+            { name: 'Perna' },
+            { name: 'Peito e Tríceps' },
+            { name: 'Costas e Bíceps' },
+            { name: 'Ombros' },
+          ];
+
+          const insertedGroups = [];
+          for (const g of defaultGroups) {
+            const res = await sql`
+              INSERT INTO public.groups (student_id, name, image)
+              VALUES (${studentId}, ${g.name}, NULL)
+              RETURNING id::text, name, image
+            `;
+            insertedGroups.push(res[0]);
+          }
+
+          groups = insertedGroups;
+
+          const groupMap = new Map();
+          groups.forEach((g: any) => {
+            groupMap.set(g.name, g.id);
+          });
+
+          const defaultExercises = [
+            { name: 'Agachamento Barra', sets: 4, reps: '8-10', groupName: 'Perna' },
+            { name: 'Leg Press 45', sets: 3, reps: '12', groupName: 'Perna' },
+            { name: 'Supino Reto', sets: 4, reps: '8', groupName: 'Peito e Tríceps' },
+            { name: 'Tríceps Polia', sets: 3, reps: '12', groupName: 'Peito e Tríceps' },
+            { name: 'Puxada Frente', sets: 4, reps: '10', groupName: 'Costas e Bíceps' },
+          ];
+
+          const insertedExercises = [];
+          for (const ex of defaultExercises) {
+            const groupId = groupMap.get(ex.groupName);
+            if (groupId) {
+              const res = await sql`
+                INSERT INTO public.exercises (student_id, group_id, name, sets, reps, image)
+                VALUES (${studentId}, ${groupId}, ${ex.name}, ${ex.sets}, ${ex.reps}, NULL)
+                RETURNING id::text, name, sets, reps, group_id::text as "groupId", image
+              `;
+              insertedExercises.push(res[0]);
+            }
+          }
+          exercises = insertedExercises;
+          console.log(`[Neon SEED] Successfully seeded ${groups.length} groups and ${exercises.length} exercises.`);
+        } catch (seedErr) {
+          console.error('[Neon SEED error - continuing]:', seedErr);
+        }
+      }
 
       // 3. Plans
       const plansRaw = await sql`
@@ -165,6 +221,15 @@ export async function POST(req: NextRequest) {
 
     if (action === 'save-group') {
       const { id, studentId, name, image } = args;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!id || !uuidRegex.test(id)) {
+        return NextResponse.json({ success: false, error: 'O ID do grupo é inválido' });
+      }
+      if (!studentId || !uuidRegex.test(studentId)) {
+        return NextResponse.json({ success: false, error: 'O ID do aluno é inválido' });
+      }
+
       const res = await sql`
         INSERT INTO public.groups (id, student_id, name, image) 
         VALUES (${id}, ${studentId}, ${name}, ${image || null})
@@ -177,15 +242,31 @@ export async function POST(req: NextRequest) {
 
     if (action === 'delete-group') {
       const { id, studentId } = args;
-      await sql`
-        DELETE FROM public.groups 
-        WHERE id = ${id} AND student_id = ${studentId}
-      `;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (uuidRegex.test(id) && uuidRegex.test(studentId)) {
+        await sql`
+          DELETE FROM public.groups 
+          WHERE id = ${id} AND student_id = ${studentId}
+        `;
+      }
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save-exercise') {
       const { id, studentId, groupId, name, sets, reps, image } = args;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!id || !uuidRegex.test(id)) {
+        return NextResponse.json({ success: false, error: 'O ID do exercício é inválido' });
+      }
+      if (!groupId || !uuidRegex.test(groupId)) {
+        return NextResponse.json({ success: false, error: 'O ID do grupo é inválido' });
+      }
+      if (!studentId || !uuidRegex.test(studentId)) {
+        return NextResponse.json({ success: false, error: 'O ID do aluno é inválido font' });
+      }
+
       const res = await sql`
         INSERT INTO public.exercises (id, student_id, group_id, name, sets, reps, image) 
         VALUES (${id}, ${studentId}, ${groupId}, ${name}, ${sets}, ${reps}, ${image || null})
@@ -198,18 +279,38 @@ export async function POST(req: NextRequest) {
 
     if (action === 'delete-exercise') {
       const { id, studentId } = args;
-      await sql`
-        DELETE FROM public.exercises 
-        WHERE id = ${id} AND student_id = ${studentId}
-      `;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (uuidRegex.test(id) && uuidRegex.test(studentId)) {
+        await sql`
+          DELETE FROM public.exercises 
+          WHERE id = ${id} AND student_id = ${studentId}
+        `;
+      }
       return NextResponse.json({ success: true });
     }
 
     if (action === 'save-plan') {
       const { studentId, dayOfWeek, groupId } = args;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!studentId || !uuidRegex.test(studentId)) {
+        return NextResponse.json({ success: false, error: 'O ID do estudante é inválido' });
+      }
+
+      let validGroupId: string | null = null;
+      if (groupId && uuidRegex.test(groupId)) {
+        const groupExists = await sql`
+          SELECT id FROM public.groups WHERE id = ${groupId}
+        `;
+        if (groupExists.length > 0) {
+          validGroupId = groupId;
+        }
+      }
+
       await sql`
         INSERT INTO public.workout_plans (student_id, day_of_week, group_id) 
-        VALUES (${studentId}, ${dayOfWeek}, ${groupId ? groupId : null})
+        VALUES (${studentId}, ${dayOfWeek}, ${validGroupId})
         ON CONFLICT (student_id, day_of_week) DO UPDATE 
         SET group_id = EXCLUDED.group_id
       `;
@@ -218,6 +319,12 @@ export async function POST(req: NextRequest) {
 
     if (action === 'save-log') {
       const { studentId, date, finished, finishedAt, exercises } = args;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!studentId || !uuidRegex.test(studentId)) {
+        return NextResponse.json({ success: false, error: 'O ID do estudante é inválido' });
+      }
+
       // 1. Upsert head log
       const logRes = await sql`
         INSERT INTO public.workout_logs (student_id, date, finished, finished_at) 
@@ -236,10 +343,14 @@ export async function POST(req: NextRequest) {
 
       if (exercises && typeof exercises === 'object') {
         for (const [exId, done] of Object.entries(exercises)) {
-          if (done) {
+          if (done && uuidRegex.test(exId)) {
+            // Safe insert select: only insert if exercise_id exists in public.exercises
             await sql`
               INSERT INTO public.workout_log_exercises (log_id, exercise_id, done) 
-              VALUES (${logId}, ${exId}, true)
+              SELECT ${logId}, id, true
+              FROM public.exercises
+              WHERE id = ${exId}
+              ON CONFLICT (log_id, exercise_id) DO NOTHING
             `;
           }
         }
